@@ -1,0 +1,12 @@
+hash: dc0ae2efb950924009ff3af3f2c94edcf8b857577b486b23e170a6cb1faf94f8
+updated: 2017-06-02T12:14:36.170669252-05:00
+imports:
+- name: github.com/msteinert/pam
+  version: 02ccfbfaf0cc627aa3aec8ef7ed5cfeec5b43f63
+- name: github.com/SermoDigital/jose
+  version: 2bd9b81ac51d6d6134fcd4fd846bd2e7347a15f9
+  subpackages:
+  - crypto
+  - jws
+  - jwt
+testImports: []
