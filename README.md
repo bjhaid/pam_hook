@@ -19,5 +19,4 @@ go build
 
 ### Todo:
 - [] Add SSL support
-- [] Make bindaddress, port, signingKey, audience, tokenExpiry, and issuer configurable
 - [] Add tests

@@ -2,16 +2,27 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
 	"github.com/msteinert/pam"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/user"
 	"runtime"
 	"time"
 )
+
+type Config struct {
+	TokenExpiresIn *int
+	SigningKey     *string
+	Audience       *string
+	ServerName     *string
+	BindAddress    *string
+	BindPort       *string
+}
 
 type User struct {
 	Username string   `json:"username"`
@@ -120,18 +131,17 @@ func authenticateUser(username string, password string) error {
 	return nil
 }
 
-func createToken(username string, signingKey string) (string, error) {
-	tokenExpiry := 10
+func createToken(username string, c *Config) (string, error) {
 	claims := jws.Claims{
 		"username": username,
 	}
-	claims.SetAudience("https://foo.com")
+	claims.SetAudience(*c.Audience)
 	claims.SetIssuedAt(time.Now())
-	claims.SetIssuer("https://pam-auth.com")
-	claims.SetExpiration(time.Now().Add(time.Minute * time.Duration(tokenExpiry)))
+	claims.SetIssuer(*c.ServerName)
+	claims.SetExpiration(time.Now().Add(time.Minute * time.Duration(*c.TokenExpiresIn)))
 
 	j := jws.NewJWT(claims, crypto.SigningMethodHS256)
-	b, err := j.Serialize([]byte(signingKey))
+	b, err := j.Serialize([]byte(*c.SigningKey))
 	if err != nil {
 		return "", err
 	}
@@ -160,47 +170,63 @@ func createResponseFromToken(token string, signingKey string) []byte {
 	}
 }
 
-func authenticateHandler(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
-	var a AuthRequest
-	if err != nil {
-		fmt.Fprintf(w, "invalid request")
-		return
-	}
-	err = json.Unmarshal(body, &a)
-	if err != nil {
-		fmt.Fprintf(w, "invalid request")
-		return
-	}
-	resp := createResponseFromToken(a.Spec.Token, "foo")
-	fmt.Fprintf(w, "%s\n", resp)
+func authenticateHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
+  return func (w http.ResponseWriter, r *http.Request) {
+    body, err := ioutil.ReadAll(r.Body)
+    var a AuthRequest
+    if err != nil {
+      fmt.Fprintln(w, "invalid request")
+      return
+    }
+    err = json.Unmarshal(body, &a)
+    if err != nil {
+      fmt.Fprintln(w, "invalid request")
+      return
+    }
+    resp := createResponseFromToken(a.Spec.Token, *c.SigningKey)
+    fmt.Fprintf(w, "%s\n", resp)
+  }
 }
 
-func tokenHandler(w http.ResponseWriter, r *http.Request) {
-	username, password, ok := r.BasicAuth()
-	signingKey := "foo"
-	if !ok {
-		http.Error(w, "Supply username and password", http.StatusNotFound)
-		return
-	}
-	if err := authenticateUser(username, password); err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
-		return
-	}
-	b, err := createToken(username, signingKey)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	fmt.Fprintf(w, "%s\n", b)
+func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request){
+  return func (w http.ResponseWriter, r *http.Request) {
+    username, password, ok := r.BasicAuth()
+    if !ok {
+      http.Error(w, "Supply username and password", http.StatusNotFound)
+      return
+    }
+    if err := authenticateUser(username, password); err != nil {
+      http.Error(w, err.Error(), http.StatusForbidden)
+      return
+    }
+    b, err := createToken(username, c)
+    if err != nil {
+      http.Error(w, err.Error(), http.StatusInternalServerError)
+      return
+    }
+    fmt.Fprintf(w, "%s\n", b)
+  }
 }
 
 func main() {
 	u, _ := user.Current()
+	config := &Config{}
+	config.TokenExpiresIn = flag.Int("token-expires-in", 10, "Specifies how long the token is valid for, default is 10 minutes")
+	config.SigningKey = flag.String("signing-key", "", "Key for signing the token (required)")
+  config.Audience = flag.String("audience", "", "Server that consumes the pam_hook endpoint")
+  config.ServerName = flag.String("server-name", "", "The domain name for pam-hook")
+  config.BindAddress = flag.String("bind-address", "", "Address to bind pam_hook to, defaults to 0.0.0.0")
+  config.BindPort = flag.String("bind-port", "8080", "Defaults to 8080")
+  flag.Parse()
 	if u.Uid != "0" {
-		panic("run pam_auth as root")
+		fmt.Fprintln(os.Stderr, "run pam_hook as root")
+		os.Exit(1)
 	}
-	http.HandleFunc("/token", tokenHandler)
-	http.HandleFunc("/authenticate", authenticateHandler)
-	http.ListenAndServe(":8080", nil)
+  if *config.SigningKey == "" {
+		fmt.Fprintln(os.Stderr, "Please provide a signing key")
+    os.Exit(1)
+  }
+	http.HandleFunc("/token", tokenHandler(config))
+	http.HandleFunc("/authenticate", authenticateHandler(config))
+  http.ListenAndServe(*config.BindAddress + ":" + *config.BindPort, nil)
 }
