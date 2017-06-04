@@ -93,3 +93,7 @@ go build
 ### Todo:
 - [] Add SSL support
 - [] Add tests
+
+### License
+
+[MIT] [license].
