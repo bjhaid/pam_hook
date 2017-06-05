@@ -96,4 +96,4 @@ go build
 
 ### License
 
-[MIT] [license].
+[MIT](LICENSE)
