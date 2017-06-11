@@ -171,41 +171,41 @@ func createResponseFromToken(token string, signingKey string) []byte {
 }
 
 func authenticateHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
-  return func (w http.ResponseWriter, r *http.Request) {
-    body, err := ioutil.ReadAll(r.Body)
-    var a AuthRequest
-    if err != nil {
-      fmt.Fprintln(w, "invalid request")
-      return
-    }
-    err = json.Unmarshal(body, &a)
-    if err != nil {
-      fmt.Fprintln(w, "invalid request")
-      return
-    }
-    resp := createResponseFromToken(a.Spec.Token, *c.SigningKey)
-    fmt.Fprintf(w, "%s\n", resp)
-  }
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		var a AuthRequest
+		if err != nil {
+			fmt.Fprintln(w, "invalid request")
+			return
+		}
+		err = json.Unmarshal(body, &a)
+		if err != nil {
+			fmt.Fprintln(w, "invalid request")
+			return
+		}
+		resp := createResponseFromToken(a.Spec.Token, *c.SigningKey)
+		fmt.Fprintf(w, "%s\n", resp)
+	}
 }
 
-func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request){
-  return func (w http.ResponseWriter, r *http.Request) {
-    username, password, ok := r.BasicAuth()
-    if !ok {
-      http.Error(w, "Supply username and password", http.StatusNotFound)
-      return
-    }
-    if err := authenticateUser(username, password); err != nil {
-      http.Error(w, err.Error(), http.StatusForbidden)
-      return
-    }
-    b, err := createToken(username, c)
-    if err != nil {
-      http.Error(w, err.Error(), http.StatusInternalServerError)
-      return
-    }
-    fmt.Fprintf(w, "%s\n", b)
-  }
+func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if !ok {
+			http.Error(w, "Supply username and password", http.StatusNotFound)
+			return
+		}
+		if err := authenticateUser(username, password); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+		b, err := createToken(username, c)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprintf(w, "%s\n", b)
+	}
 }
 
 func main() {
@@ -213,20 +213,20 @@ func main() {
 	config := &Config{}
 	config.TokenExpiresIn = flag.Int("token-expires-in", 10, "Specifies how long the token is valid for, default is 10 minutes")
 	config.SigningKey = flag.String("signing-key", "", "Key for signing the token (required)")
-  config.Audience = flag.String("audience", "", "Server that consumes the pam_hook endpoint")
-  config.ServerName = flag.String("server-name", "", "The domain name for pam-hook")
-  config.BindAddress = flag.String("bind-address", "", "Address to bind pam_hook to, defaults to 0.0.0.0")
-  config.BindPort = flag.String("bind-port", "8080", "Defaults to 8080")
-  flag.Parse()
+	config.Audience = flag.String("audience", "", "Server that consumes the pam_hook endpoint")
+	config.ServerName = flag.String("server-name", "", "The domain name for pam-hook")
+	config.BindAddress = flag.String("bind-address", "", "Address to bind pam_hook to, defaults to 0.0.0.0")
+	config.BindPort = flag.String("bind-port", "8080", "Defaults to 8080")
+	flag.Parse()
 	if u.Uid != "0" {
 		fmt.Fprintln(os.Stderr, "run pam_hook as root")
 		os.Exit(1)
 	}
-  if *config.SigningKey == "" {
+	if *config.SigningKey == "" {
 		fmt.Fprintln(os.Stderr, "Please provide a signing key")
-    os.Exit(1)
-  }
+		os.Exit(1)
+	}
 	http.HandleFunc("/token", tokenHandler(config))
 	http.HandleFunc("/authenticate", authenticateHandler(config))
-  http.ListenAndServe(*config.BindAddress + ":" + *config.BindPort, nil)
+	http.ListenAndServe(*config.BindAddress+":"+*config.BindPort, nil)
 }
