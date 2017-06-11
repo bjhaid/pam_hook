@@ -37,6 +37,36 @@ func init() {
 	}
 }
 
+func TestLookupGroups(t *testing.T) {
+	expected := []string{"foo", "deployer", "admin"}
+	actual, err := lookupGroups("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(actual) != 3 {
+		t.Errorf("Expected returned groups to be 3 got %v", len(actual))
+	}
+
+	for i := range actual {
+		if actual[i] != expected[i] {
+			t.Errorf("lookupGroups returned wrong groups: got %v want %v",
+				actual, expected)
+		}
+	}
+}
+
+func TestLookupGroupsNonExistingUser(t *testing.T) {
+	actual, err := lookupGroups("bar")
+	if err == nil {
+		t.Errorf("Expected to get an 'unknown user error'")
+	}
+
+	if len(actual) != 0 {
+		t.Errorf("Expected returned groups to be 0 got %v", len(actual))
+	}
+}
+
 func TestTokenHandlerHappyPath(t *testing.T) {
 	req, err := http.NewRequest("GET", "/token", nil)
 	if err != nil {
