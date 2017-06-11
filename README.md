@@ -82,21 +82,13 @@ endpoint pamhook is deployed to)
 
 ### Building:
 
-#### With docker:
-
 `docker build -t pam_hook .`
 
-`docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook pam_hook /bin/bash -c "cd /usr/local/go/src/github.com/bjhaid/pam_hook && go build"`
+`docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook --rm pam_hook /bin/bash -c "cd /usr/local/go/src/github.com/bjhaid/pam_hook && go build"`
 
-#### Without docker:
+### Testing:
 
-Install the pam libraries and development files:
-
-```
-apt-get install libpam0g:amd64
-apt-get install libpam0g-dev:amd64
-go build
-```
+`docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook --rm pam_hook /bin/bash -c "cd /usr/local/go/src/github.com/bjhaid/pam_hook && go test"`
 
 ### Todo:
 - [] Add SSL support
