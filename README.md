@@ -1,3 +1,5 @@
+[![Build Status](https://api.travis-ci.org/bjhaid/pam_hook.svg?branch=master)](https://travis-ci.org/bjhaid/pam_hook)
+
 # pam_hook
 
 `pam_hook` provides a pam authentication endpoint that can be used with kubernetes
