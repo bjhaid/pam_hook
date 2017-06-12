@@ -92,6 +92,7 @@ endpoint pamhook is deployed to)
 
 ### Todo:
 - [] Add SSL support
+- [] Add Logging
 
 ### License
 
