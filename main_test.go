@@ -2,24 +2,44 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 )
 
-var expiry = 1
-var signingKey = "foo"
-var audience = "k8s.io"
-var servername = "pamhook.com"
-var config = &Config{
-	SigningKey:     &signingKey,
-	TokenExpiresIn: &expiry,
-	Audience:       &audience,
-	ServerName:     &servername,
-}
+var (
+	expiry     = 1
+	signingKey = "foo"
+	audience   = "k8s.io"
+	servername = "pamhook.com"
+	config     = &Config{
+		SigningKey:     &signingKey,
+		TokenExpiresIn: &expiry,
+		Audience:       &audience,
+		ServerName:     &servername}
+	userS = &User{
+		Username: "foo",
+		Uid:      "1000",
+		Groups:   []string{"foo", "deployer", "admin"}}
+	failureStatus   = &Status{Authenticated: false}
+	status          = &Status{User: userS, Authenticated: true}
+	successResponse = &Response{
+		ApiVersion: "authentication.k8s.io/v1beta1",
+		Kind:       "TokenReview",
+		Status:     status}
+	failureResponse = &Response{
+		ApiVersion: "authentication.k8s.io/v1beta1",
+		Kind:       "TokenReview",
+		Status:     failureStatus}
+	authRequest = AuthRequest{
+		ApiVersion: "authentication.k8s.io/v1beta1",
+		Kind:       "TokenReview"}
+)
 
 func init() {
 	cmd := exec.Command("groupadd", "deployer")
@@ -121,4 +141,96 @@ func TestTokenHandlerWrongCredentials(t *testing.T) {
 		t.Errorf("handler returned unexpected body: got {%v} want {%v}",
 			rr.Body.String(), expected)
 	}
+}
+
+func TestAuthenticateHandler(t *testing.T) {
+	token, err := createToken("foo", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authRequest.Spec = &Spec{Token: token}
+	reqBody, err := json.Marshal(authRequest)
+	req, err := http.NewRequest("POST", "/authenticate", bytes.NewBuffer(reqBody))
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(authenticateHandler(config))
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+	actual := &Response{}
+	err = json.Unmarshal([]byte(rr.Body.String()), actual)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !(reflect.DeepEqual(*actual, *successResponse)) {
+		t.Errorf("handler returned wrong response: got %v want %v",
+			actual, successResponse)
+	}
+	authRequest.Spec = nil
+}
+
+func TestAuthenticateHandlerExpiredToken(t *testing.T) {
+	expiry := -1
+	oldExpiry := config.TokenExpiresIn
+	config.TokenExpiresIn = &expiry
+	token, err := createToken("foo", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authRequest.Spec = &Spec{Token: token}
+	reqBody, err := json.Marshal(authRequest)
+	req, err := http.NewRequest("POST", "/authenticate", bytes.NewBuffer(reqBody))
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(authenticateHandler(config))
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+	actual := &Response{}
+	err = json.Unmarshal([]byte(rr.Body.String()), actual)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !(reflect.DeepEqual(*actual, *failureResponse)) {
+		t.Errorf("handler returned wrong response: got %v want %v",
+			actual, successResponse)
+	}
+	authRequest.Spec = nil
+	config.TokenExpiresIn = oldExpiry
+}
+
+func TestAuthenticateHandlerInvalidUser(t *testing.T) {
+	config.TokenExpiresIn = &expiry
+	token, err := createToken("bar", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authRequest.Spec = &Spec{Token: token}
+	reqBody, err := json.Marshal(authRequest)
+	req, err := http.NewRequest("POST", "/authenticate", bytes.NewBuffer(reqBody))
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(authenticateHandler(config))
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+	actual := &Response{}
+	err = json.Unmarshal([]byte(rr.Body.String()), actual)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !(reflect.DeepEqual(*actual, *failureResponse)) {
+		t.Errorf("handler returned wrong response: got %v want %v",
+			actual, successResponse)
+	}
+	authRequest.Spec = nil
 }
