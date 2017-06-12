@@ -1,0 +1,7 @@
+sudo: required
+services:
+  - docker
+before_script:
+  - docker build -t pam_hook .
+script:
+  - docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook --rm pam_hook /bin/bash -c "cd /usr/local/go/src/github.com/bjhaid/pam_hook && go test"
