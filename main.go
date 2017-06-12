@@ -22,6 +22,8 @@ type Config struct {
 	ServerName     *string
 	BindAddress    *string
 	BindPort       *string
+	TlsKeyFile     *string
+	TlsCertFile    *string
 }
 
 type User struct {
@@ -217,9 +219,19 @@ func main() {
 	config.ServerName = flag.String("server-name", "", "The domain name for pam-hook")
 	config.BindAddress = flag.String("bind-address", "", "Address to bind pam_hook to, defaults to 0.0.0.0")
 	config.BindPort = flag.String("bind-port", "8080", "Defaults to 8080")
+	config.TlsKeyFile = flag.String("key-file", "", "Absolute path to TLS private key file")
+	config.TlsCertFile = flag.String("cert-file", "", "Absolute path to TLS CA certificate")
 	flag.Parse()
 	if u.Uid != "0" {
 		fmt.Fprintln(os.Stderr, "run pam_hook as root")
+		os.Exit(1)
+	}
+	if *config.TlsKeyFile == "" {
+		fmt.Fprintln(os.Stderr, "Please provide a path to a tls private key file")
+		os.Exit(1)
+	}
+	if *config.TlsCertFile == "" {
+		fmt.Fprintln(os.Stderr, "Please provide a path to a tls CA certificate")
 		os.Exit(1)
 	}
 	if *config.SigningKey == "" {
@@ -228,5 +240,5 @@ func main() {
 	}
 	http.HandleFunc("/token", tokenHandler(config))
 	http.HandleFunc("/authenticate", authenticateHandler(config))
-	http.ListenAndServe(*config.BindAddress+":"+*config.BindPort, nil)
+	http.ListenAndServeTLS(*config.BindAddress+":"+*config.BindPort, *config.TlsCertFile, *config.TlsKeyFile, nil)
 }

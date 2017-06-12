@@ -1,7 +1,6 @@
 [![Build Status](https://api.travis-ci.org/bjhaid/pam_hook.svg?branch=master)](https://travis-ci.org/bjhaid/pam_hook)
 
 # pam_hook
-
 `pam_hook` provides a pam authentication endpoint that can be used with kubernetes
 
 ### How it works
@@ -9,7 +8,7 @@
 - The user hits the `/token` endpoint of `pamhook` and gets a token in exchange for their
 OS username and password, example request:
 ```bash
-curl localhost:6443/token -u bjhaid
+curl --cacert pamhook_cert.crt https://localhost:6443/token -u bjhaid
 Enter host password for user 'bjhaid':
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIiLCJleHAiOjE0OTY2MTQwMzcsImlhdCI6MTQ5NjYxMjIzNywiaXNzIjoiIiwidXNlcm5hbWUiOiJiamhhaWQifQ.8GVZJJPa_GYxcsHy-WBMYlel_JSyoSLXnwnt4Bp_Nk0
 ```
@@ -53,8 +52,9 @@ However if the token is invalid or has expired `pam_hook` responds with:
 - Kubernetes proceeds based on the value of `"authenticated"`
 
 ### Usage instructions
-- For supported options run `./pam_hook -help`
-- Deploy pam_hook behind an SSL terminating proxy (nginx or haproxy or ...)
+- Run pam_hook as below:
+`./pam_hook -cert-file pamhook_cert.crt -key-file pamhook_key.crt -signing-key foo -bind-port 6443`
+for more options run: `./pam_hook -help`
 - Create a kubeconfig file as below:
 ```
 apiVersion: v1
@@ -79,7 +79,7 @@ contexts:
 --authentication-token-webhook-config-file flag see the
 [kubernetes documentation](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
 for more information
-- Get a token curl -u bjhaid https://pamhook:6443/token (replacing pamhook:6443 with the
+- Get a token curl -u bjhaid --cacert pamhook_cert.crt https://pamhook:6443/token (replacing pamhook:6443 with the
 endpoint pamhook is deployed to)
 
 ### Building:
@@ -93,7 +93,6 @@ endpoint pamhook is deployed to)
 `docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook --rm pam_hook /bin/bash -c "cd /usr/local/go/src/github.com/bjhaid/pam_hook && go test"`
 
 ### Todo:
-- [] Add SSL support
 - [] Add Logging
 
 ### License
