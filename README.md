@@ -1,7 +1,48 @@
 [![Build Status](https://api.travis-ci.org/bjhaid/pam_hook.svg?branch=master)](https://travis-ci.org/bjhaid/pam_hook)
 
 # pam_hook
-`pam_hook` provides a pam authentication endpoint that can be used with kubernetes
+`pam_hook` provides a pam webhook endpoint that can be used with kubernetes
+
+### Who should use this?
+
+- You currently use unix users (for authentication) and groups (for authorization) and want a seamless migration of your existing authentication and authorization mechanisms
+- You use LDAP, have some caching set up (sssd, nsscache etc., if you don't have one set up you should seriously consider one) and will like to take advantage of the cache (pam_hook relies on PAM hence gets the existing cache for free).
+- You want some tooling that you can fully automate from the command line
+- You are shopping for a kubernetes authentication mechanism
+
+### Usage instructions
+
+- Run pam_hook as below:
+
+`./pam_hook -cert-file pamhook_cert.crt -key-file pamhook_key.crt -signing-key foo -bind-port 6443`
+for more options run: `./pam_hook -help`
+
+- Create a kubeconfig file as below:
+```
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: /Users/bjhaid/ca.pem
+    server: https://pamhook:6443/authenticate
+  name: pamhook
+users:
+  - name: pamhook
+    user:
+      client-certificate: /Users/bjhaid/pamhook.pem
+      client-key: /Users/bjhaid/pamhook.key
+current-context: pamhook
+contexts:
+- context:
+    cluster: pamhook
+    user: pamhook
+  name: pamhook
+```
+
+- Pass the path to the kubeconfig file to the kube-apiserver via the
+--authentication-token-webhook-config-file flag see the
+[kubernetes documentation](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
+for more information
+Get a token curl -u bjhaid --cacert pamhook_cert.crt https://pamhook:6443/token 
 
 ### How it works
 
@@ -50,37 +91,6 @@ However if the token is invalid or has expired `pam_hook` responds with:
 }
 ```
 - Kubernetes proceeds based on the value of `"authenticated"`
-
-### Usage instructions
-- Run pam_hook as below:
-`./pam_hook -cert-file pamhook_cert.crt -key-file pamhook_key.crt -signing-key foo -bind-port 6443`
-for more options run: `./pam_hook -help`
-- Create a kubeconfig file as below:
-```
-apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority: /Users/bjhaid/ca.pem
-    server: https://pamhook:6443/authenticate
-  name: pamhook
-users:
-  - name: pamhook
-    user:
-      client-certificate: /Users/bjhaid/pamhook.pem
-      client-key: /Users/bjhaid/pamhook.key
-current-context: pamhook
-contexts:
-- context:
-    cluster: pamhook
-    user: pamhook
-  name: pamhook
-```
-- Pass the path to the kubeconfig file to the kube-apiserver via the
---authentication-token-webhook-config-file flag see the
-[kubernetes documentation](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
-for more information
-- Get a token curl -u bjhaid --cacert pamhook_cert.crt https://pamhook:6443/token (replacing pamhook:6443 with the
-endpoint pamhook is deployed to)
 
 ### Building:
 
