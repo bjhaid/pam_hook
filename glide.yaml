@@ -2,3 +2,4 @@ package: github.com/bjhaid/pam_auth
 import:
   - package: github.com/SermoDigital/jose
     package: github.com/msteinert/pam
+    package: github.com/golang/glog

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
+	"github.com/golang/glog"
 	"github.com/msteinert/pam"
 	"io/ioutil"
 	"net/http"
@@ -155,12 +156,12 @@ func createResponseFromToken(token string, signingKey string) []byte {
 	valid := true
 	if err != nil {
 		valid = false
-		fmt.Println(err) // log this line
+		glog.Errorf("Token supplied is invalide due to: %s", err)
 	}
 	uS, err := NewUser(username)
 	if err != nil {
 		valid = false
-		fmt.Println(err) // log this line
+		glog.Errorf("The user: %s details cannot be retrieved due to: %s", username, err)
 	}
 	status := NewStatus(uS, valid)
 	response := NewResponse(status)
@@ -175,6 +176,8 @@ func createResponseFromToken(token string, signingKey string) []byte {
 func authenticateHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
+		status := http.StatusOK
+		glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
 		var a AuthRequest
 		if err != nil {
 			fmt.Fprintln(w, "invalid request")
@@ -193,19 +196,27 @@ func authenticateHandler(c *Config) func(w http.ResponseWriter, r *http.Request)
 func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		username, password, ok := r.BasicAuth()
+		status := http.StatusOK
 		if !ok {
+			status = http.StatusNotFound
+			glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
 			http.Error(w, "Supply username and password", http.StatusNotFound)
 			return
 		}
 		if err := authenticateUser(username, password); err != nil {
+			status = http.StatusForbidden
+			glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
 		b, err := createToken(username, c)
 		if err != nil {
+			status = http.StatusInternalServerError
+			glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
 		fmt.Fprintf(w, "%s\n", b)
 	}
 }
@@ -221,7 +232,10 @@ func main() {
 	config.BindPort = flag.String("bind-port", "8080", "Defaults to 8080")
 	config.TlsKeyFile = flag.String("key-file", "", "Absolute path to TLS private key file")
 	config.TlsCertFile = flag.String("cert-file", "", "Absolute path to TLS CA certificate")
+	flag.Set("logtostderr", "true")
+	flag.Set("V", "2")
 	flag.Parse()
+	defer glog.Flush()
 	if u.Uid != "0" {
 		fmt.Fprintln(os.Stderr, "run pam_hook as root")
 		os.Exit(1)
@@ -240,5 +254,7 @@ func main() {
 	}
 	http.HandleFunc("/token", tokenHandler(config))
 	http.HandleFunc("/authenticate", authenticateHandler(config))
-	http.ListenAndServeTLS(*config.BindAddress+":"+*config.BindPort, *config.TlsCertFile, *config.TlsKeyFile, nil)
+	bind := *config.BindAddress + ":" + *config.BindPort
+	glog.Infof("Starting pam_hook on %s", bind)
+	http.ListenAndServeTLS(bind, *config.TlsCertFile, *config.TlsKeyFile, nil)
 }
