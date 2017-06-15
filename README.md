@@ -119,9 +119,6 @@ $> docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook --rm pam_hook
 $> docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook --rm pam_hook /bin/bash -c "cd /usr/local/go/src/github.com/bjhaid/pam_hook && go test"
 ```
 
-### Todo:
-- [] Add Logging
-
 ### License
 
 [MIT](LICENSE)
