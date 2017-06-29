@@ -110,7 +110,7 @@ However if the token is invalid or has expired `pam_hook` responds with:
 
 ### Healthcheck:
 
-Health check route is `/hearbeat`
+Health check route is `/heartbeat`
 
 
 ### Building:
