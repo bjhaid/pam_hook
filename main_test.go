@@ -143,6 +143,18 @@ func TestTokenHandlerWrongCredentials(t *testing.T) {
 	}
 }
 
+func TestHeartbeatHandler(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/heartbeat", nil)
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(heartbeatHandler())
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+}
+
 func TestAuthenticateHandler(t *testing.T) {
 	token, err := createToken("foo", config)
 	if err != nil {

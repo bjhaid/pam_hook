@@ -106,6 +106,11 @@ However if the token is invalid or has expired `pam_hook` responds with:
 ```
 - Kubernetes proceeds based on the value of `"authenticated"`.
 
+### Healthcheck:
+
+Health check route is `/hearbeat`
+
+
 ### Building:
 
 ```

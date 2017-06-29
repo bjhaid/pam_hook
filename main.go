@@ -173,7 +173,15 @@ func createResponseFromToken(token string, signingKey string) []byte {
 	}
 }
 
-func authenticateHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
+func heartbeatHandler() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusOK
+		glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
+		fmt.Fprintf(w, "ok\n")
+  }
+}
+
+func authenticateHandler(c *Config) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
 		status := http.StatusOK
@@ -252,6 +260,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Please provide a signing key")
 		os.Exit(1)
 	}
+	http.HandleFunc("/heartbeat", heartbeatHandler())
 	http.HandleFunc("/token", tokenHandler(config))
 	http.HandleFunc("/authenticate", authenticateHandler(config))
 	bind := *config.BindAddress + ":" + *config.BindPort
