@@ -294,5 +294,9 @@ func main() {
 	http.HandleFunc("/authenticate", authenticateHandler(config))
 	bind := *config.BindAddress + ":" + *config.BindPort
 	glog.Infof("Starting pam_hook on %s", bind)
-	http.ListenAndServeTLS(bind, *config.TlsCertFile, *config.TlsKeyFile, nil)
+	err := http.ListenAndServeTLS(bind, *config.TlsCertFile, *config.TlsKeyFile, nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to start pamhook due to: %s", err)
+		os.Exit(1)
+	}
 }
