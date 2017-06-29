@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -54,6 +55,41 @@ func init() {
 	if err != nil {
 		fmt.Println(out.String())
 		fmt.Println(err)
+	}
+}
+
+func TestNewConfig(t *testing.T) {
+	os.Setenv("PAMHOOK_TOKEN_EXPIRES_IN", "5")
+	os.Setenv("PAMHOOK_SIGNING_KEY", "foo")
+	os.Setenv("PAMHOOK_AUDIENCE", "k8s.io")
+	os.Setenv("PAMHOOK_SERVERNAME", "pamhook.io")
+	os.Setenv("PAMHOOK_TLS_KEY_FILE", "/etc/ssl/private/pamhook.key")
+	os.Setenv("PAMHOOK_TLS_CERT_FILE", "/etc/ssl/certs/pamhook.cert")
+
+	nConfig := *newConfig()
+
+	if *(nConfig.TokenExpiresIn) != 5 {
+		t.Errorf("Expected returned TokenExpiresIn to be 5 got %v", *(nConfig.TokenExpiresIn))
+	}
+
+	if *(nConfig.SigningKey) != "foo" {
+		t.Errorf("Expected returned SigningKey to be 'foo' got %v", *(nConfig.SigningKey))
+	}
+
+	if *(nConfig.Audience) != "k8s.io" {
+		t.Errorf("Expected returned Audience to be 5 got %v", *(nConfig.Audience))
+	}
+
+	if *(nConfig.ServerName) != "pamhook.io" {
+		t.Errorf("Expected returned ServerName to be 'pamhook.io' got %v", *(nConfig.ServerName))
+	}
+
+	if *(nConfig.TlsKeyFile) != "/etc/ssl/private/pamhook.key" {
+		t.Errorf("Expected returned TlsKeyFile to be '/etc/ssl/private/pamhook.key' got %v", *(nConfig.TlsKeyFile))
+	}
+
+	if *(nConfig.TlsCertFile) != "/etc/ssl/certs/pamhook.cert" {
+		t.Errorf("Expected returned TlsCertFile to be '/etc/ssl/certs/pamhook.cert' got %v", *(nConfig.TlsCertFile))
 	}
 }
 

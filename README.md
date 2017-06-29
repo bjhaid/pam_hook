@@ -18,11 +18,13 @@ A [PAM](http://www.linux-pam.org/) webhook endpoint that can be used with [Kuber
 $> ./pam_hook -cert-file pamhook_cert.crt -key-file pamhook_key.crt -signing-key foo -bind-port 6443
 ```
 
-Or, for more options:
+Most of the flags can be configured also via environment variables, run for more options:
 
 ```
 $> ./pam_hook -help
 ```
+
+Command line flags override options configured via environment variables.
 
 - Create a kubeconfig file as below:
 ```

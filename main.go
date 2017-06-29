@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/user"
 	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -52,6 +53,30 @@ type AuthRequest struct {
 	ApiVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`
 	Spec       *Spec  `json:"spec"`
+}
+
+func newConfig() *Config {
+	c := &Config{}
+	empty := ""
+	port := "8080" //default port
+	c.BindAddress = &empty
+	c.BindPort = &port
+	tokenExpiry, err := strconv.Atoi(os.Getenv("PAMHOOK_TOKEN_EXPIRES_IN"))
+	if err != nil {
+		tokenExpiry = 10 //default token expiry
+	}
+	c.TokenExpiresIn = &tokenExpiry
+	signingKey := os.Getenv("PAMHOOK_SIGNING_KEY")
+	c.SigningKey = &signingKey
+	audience := os.Getenv("PAMHOOK_AUDIENCE")
+	c.Audience = &audience
+	serverName := os.Getenv("PAMHOOK_SERVERNAME")
+	c.ServerName = &serverName
+	tlsKeyFile := os.Getenv("PAMHOOK_TLS_KEY_FILE")
+	c.TlsKeyFile = &tlsKeyFile
+	tlsCertFile := os.Getenv("PAMHOOK_TLS_CERT_FILE")
+	c.TlsCertFile = &tlsCertFile
+	return c
 }
 
 func lookupGroups(username string) ([]string, error) {
@@ -156,7 +181,7 @@ func createResponseFromToken(token string, signingKey string) []byte {
 	valid := true
 	if err != nil {
 		valid = false
-		glog.Errorf("Token supplied is invalide due to: %s", err)
+		glog.Errorf("Token supplied is invalid due to: %s", err)
 	}
 	uS, err := NewUser(username)
 	if err != nil {
@@ -178,7 +203,7 @@ func heartbeatHandler() func(http.ResponseWriter, *http.Request) {
 		status := http.StatusOK
 		glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
 		fmt.Fprintf(w, "ok\n")
-  }
+	}
 }
 
 func authenticateHandler(c *Config) func(http.ResponseWriter, *http.Request) {
@@ -231,15 +256,15 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	u, _ := user.Current()
-	config := &Config{}
-	config.TokenExpiresIn = flag.Int("token-expires-in", 10, "Specifies how long the token is valid for, default is 10 minutes")
-	config.SigningKey = flag.String("signing-key", "", "Key for signing the token (required)")
-	config.Audience = flag.String("audience", "", "Server that consumes the pam_hook endpoint")
-	config.ServerName = flag.String("server-name", "", "The domain name for pam-hook")
-	config.BindAddress = flag.String("bind-address", "", "Address to bind pam_hook to, defaults to 0.0.0.0")
-	config.BindPort = flag.String("bind-port", "8080", "Defaults to 8080")
-	config.TlsKeyFile = flag.String("key-file", "", "Absolute path to TLS private key file")
-	config.TlsCertFile = flag.String("cert-file", "", "Absolute path to TLS CA certificate")
+	config := newConfig()
+	flag.IntVar(config.TokenExpiresIn, "token-expires-in", *config.TokenExpiresIn, "Specifies how long the token is valid for, configurable via PAMHOOK_TOKEN_EXPIRES_IN environment variable")
+	flag.StringVar(config.SigningKey, "signing-key", *config.SigningKey, "Key for signing the token (required), configurable via PAMHOOK_SIGNING_KEY environment variable")
+	flag.StringVar(config.Audience, "audience", *config.Audience, "Server that consumes the pam_hook endpoint, configurable via PAMHOOK_AUDIENCE environment variable")
+	flag.StringVar(config.ServerName, "server-name", *config.ServerName, "The domain name for pam-hook, configurable via PAMHOOK_SERVERNAME environment variable")
+	flag.StringVar(config.BindAddress, "bind-address", *config.BindAddress, "Address to bind pam_hook to")
+	flag.StringVar(config.BindPort, "bind-port", *config.BindPort, "")
+	flag.StringVar(config.TlsKeyFile, "key-file", *config.TlsKeyFile, "Absolute path to TLS private key file, configurable via PAMHOOK_TLS_KEY_FILE environment variable")
+	flag.StringVar(config.TlsCertFile, "cert-file", *config.TlsCertFile, "Absolute path to TLS CA certificate, configurable via PAMHOOK_TLS_CERT_FILE environment variable")
 	flag.Set("logtostderr", "true")
 	flag.Set("V", "2")
 	flag.Parse()
@@ -256,8 +281,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Please provide a path to a tls CA certificate")
 		os.Exit(1)
 	}
-	if *config.SigningKey == "" {
+	if *(config.SigningKey) == "" {
 		fmt.Fprintln(os.Stderr, "Please provide a signing key")
+		os.Exit(1)
+	}
+	if *config.TokenExpiresIn == 0 {
+		fmt.Fprintln(os.Stderr, "Please provide a token expiry")
 		os.Exit(1)
 	}
 	http.HandleFunc("/heartbeat", heartbeatHandler())
