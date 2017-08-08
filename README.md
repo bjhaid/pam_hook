@@ -126,6 +126,27 @@ $> docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook --rm pam_hook
 $> docker run -v $PWD:/usr/local/go/src/github.com/bjhaid/pam_hook --rm pam_hook /bin/bash -c "cd /usr/local/go/src/github.com/bjhaid/pam_hook && go test"
 ```
 
+### Running in Docker (Host Auth)
+
+```
+  docker run -it --rm  -e "PAMHOOK_SIGNING_KEY=foo" \
+  -v /etc/nsswitch.conf:/etc/nsswitch.conf \
+  -v /etc/group:/etc/group -v /etc/shadow:/etc/shadow \
+  -v /etc/passwd:/etc/passwd -v /etc/pam.conf:/etc/pam.conf \
+  -v /etc/pam.d/:/etc/pam.d -p 6443:6443 \
+  -v $PWD/pamhook_cert.crt:/etc/ssl/certs/pamhook_cert.crt \
+  -v $PWD/pamhook_key.crt:/etc/ssl/private/pamhook_key.crt \
+  bjhaid/pam_hook:0.1.0 /usr/bin/pam_hook \
+  -cert-file /etc/ssl/certs/pamhook_cert.crt \
+  -key-file /etc/ssl/private/pamhook_key.crt \
+  -bind-port 6443 -v 2
+
+```
+
+Make sure you change the certs to match your actual certificate path. On OSX,
+you'll need to prepend the etc directories with `/private`, OSX also does not
+have `/etc/nsswitch` and `/etc/pam.conf`
+
 ### License
 
 [MIT](LICENSE)
