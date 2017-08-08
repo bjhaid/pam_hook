@@ -266,7 +266,7 @@ func main() {
 	flag.StringVar(config.TlsKeyFile, "key-file", *config.TlsKeyFile, "Absolute path to TLS private key file, configurable via PAMHOOK_TLS_KEY_FILE environment variable")
 	flag.StringVar(config.TlsCertFile, "cert-file", *config.TlsCertFile, "Absolute path to TLS CA certificate, configurable via PAMHOOK_TLS_CERT_FILE environment variable")
 	flag.Set("logtostderr", "true")
-	flag.Set("V", "2")
+	flag.Set("v", "2")
 	flag.Parse()
 	defer glog.Flush()
 	if u.Uid != "0" {
