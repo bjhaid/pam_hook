@@ -257,7 +257,7 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 func main() {
 	u, _ := user.Current()
 	config := newConfig()
-	flag.IntVar(config.TokenExpiresIn, "token-expires-in", *config.TokenExpiresIn, "Specifies how long the token is valid for, configurable via PAMHOOK_TOKEN_EXPIRES_IN environment variable")
+	flag.IntVar(config.TokenExpiresIn, "token-expires-in", *config.TokenExpiresIn, "Specifies how long the token is valid for in minutes, configurable via PAMHOOK_TOKEN_EXPIRES_IN environment variable")
 	flag.StringVar(config.SigningKey, "signing-key", *config.SigningKey, "Key for signing the token (required), configurable via PAMHOOK_SIGNING_KEY environment variable")
 	flag.StringVar(config.Audience, "audience", *config.Audience, "Server that consumes the pam_hook endpoint, configurable via PAMHOOK_AUDIENCE environment variable")
 	flag.StringVar(config.ServerName, "server-name", *config.ServerName, "The domain name for pam-hook, configurable via PAMHOOK_SERVERNAME environment variable")
