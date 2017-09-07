@@ -22,6 +22,37 @@ Most of the flags can be configured also via environment variables, run for more
 
 ```
 $> ./pam_hook -help
+Usage of ./pam_hook:
+  -alsologtostderr
+        log to standard error as well as files
+  -audience string
+        Server that consumes the pam_hook endpoint, configurable via PAMHOOK_AUDIENCE environment variable
+  -bind-address string
+        Address to bind pam_hook to
+  -bind-port string
+         (default "8080")
+  -cert-file string
+        Absolute path to TLS CA certificate, configurable via PAMHOOK_TLS_CERT_FILE environment variable
+  -key-file string
+        Absolute path to TLS private key file, configurable via PAMHOOK_TLS_KEY_FILE environment variable
+  -log_backtrace_at value
+        when logging hits line file:N, emit a stack trace
+  -log_dir string
+        If non-empty, write log files in this directory
+  -logtostderr
+        log to standard error instead of files
+  -server-name string
+        The domain name for pam-hook, configurable via PAMHOOK_SERVERNAME environment variable
+  -signing-key string
+        Key for signing the token (required), configurable via PAMHOOK_SIGNING_KEY environment variable
+  -stderrthreshold value
+        logs at or above this threshold go to stderr
+  -token-expires-in int
+        Specifies how long the token is valid for in minutes, configurable via PAMHOOK_TOKEN_EXPIRES_IN environment variable (default 10)
+  -v value
+        log level for V logs
+  -vmodule value
+        comma-separated list of pattern=N settings for file-filtered logging
 ```
 
 Command line flags override options configured via environment variables.
