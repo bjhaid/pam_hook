@@ -4,10 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/SermoDigital/jose/crypto"
-	"github.com/SermoDigital/jose/jws"
-	"github.com/golang/glog"
-	"github.com/msteinert/pam"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -15,6 +11,11 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/SermoDigital/jose/crypto"
+	"github.com/SermoDigital/jose/jws"
+	"github.com/golang/glog"
+	"github.com/msteinert/pam"
 )
 
 type Config struct {
