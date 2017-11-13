@@ -1,14 +1,18 @@
-hash: ca05dbca31a56ea5e31ca783e95e64a66a9312e31d351dfb3e09e5add2920ca9
-updated: 2017-06-14T20:12:08.516361358-05:00
+hash: ba680fd166def8c4bad4bc347e9ccd91035365a950a926da3225e4df88cc34f5
+updated: 2017-11-13T16:06:31.132275306Z
 imports:
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/msteinert/pam
-  version: db23a9ef3ffc5aa2e7ca5da56bd86f725df2c27f
+  version: f4cd9f5e29232537a12db1678f48c702ad6896b7
 - name: github.com/SermoDigital/jose
   version: 2bd9b81ac51d6d6134fcd4fd846bd2e7347a15f9
   subpackages:
   - crypto
   - jws
   - jwt
+- name: golang.org/x/sys
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
+  subpackages:
+  - unix
 testImports: []

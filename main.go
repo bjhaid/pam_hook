@@ -10,12 +10,14 @@ import (
 	"os/user"
 	"runtime"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
 	"github.com/golang/glog"
 	"github.com/msteinert/pam"
+	"golang.org/x/sys/unix"
 )
 
 type Config struct {
@@ -27,6 +29,7 @@ type Config struct {
 	BindPort       *string
 	TlsKeyFile     *string
 	TlsCertFile    *string
+	DisableMlock   *bool
 }
 
 type User struct {
@@ -77,6 +80,9 @@ func newConfig() *Config {
 	c.TlsKeyFile = &tlsKeyFile
 	tlsCertFile := os.Getenv("PAMHOOK_TLS_CERT_FILE")
 	c.TlsCertFile = &tlsCertFile
+	// Have to take a pointer so we need a new var.
+	disableMlock := false
+	c.DisableMlock = &disableMlock
 	return c
 }
 
@@ -266,9 +272,11 @@ func main() {
 	flag.StringVar(config.BindPort, "bind-port", *config.BindPort, "")
 	flag.StringVar(config.TlsKeyFile, "key-file", *config.TlsKeyFile, "Absolute path to TLS private key file, configurable via PAMHOOK_TLS_KEY_FILE environment variable")
 	flag.StringVar(config.TlsCertFile, "cert-file", *config.TlsCertFile, "Absolute path to TLS CA certificate, configurable via PAMHOOK_TLS_CERT_FILE environment variable")
+	flag.BoolVar(config.DisableMlock, "disable-mlock", *config.DisableMlock, "Disable calling sys mlock")
 	flag.Set("logtostderr", "true")
 	flag.Set("v", "2")
 	flag.Parse()
+
 	defer glog.Flush()
 	if u.Uid != "0" {
 		fmt.Fprintln(os.Stderr, "run pam_hook as root")
@@ -289,6 +297,12 @@ func main() {
 	if *config.TokenExpiresIn == 0 {
 		fmt.Fprintln(os.Stderr, "Please provide a token expiry")
 		os.Exit(1)
+	}
+	if !*config.DisableMlock {
+		if err := unix.Mlockall(syscall.MCL_CURRENT | syscall.MCL_FUTURE); err != nil {
+			fmt.Println(os.Stderr, "Unable to lock memory: %s", err)
+			os.Exit(1)
+		}
 	}
 	http.HandleFunc("/heartbeat", heartbeatHandler())
 	http.HandleFunc("/token", tokenHandler(config))
