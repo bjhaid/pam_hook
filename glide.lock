@@ -1,6 +1,8 @@
-hash: ba680fd166def8c4bad4bc347e9ccd91035365a950a926da3225e4df88cc34f5
-updated: 2017-11-13T16:06:31.132275306Z
+hash: 9941f6df8cb0f62fb799e8e89059f84fba6e0993405a7e68c97f9e5e6864c02a
+updated: 2017-11-13T18:36:06.229503108Z
 imports:
+- name: github.com/awnumar/memguard
+  version: 6844db088c1e9ff46875cb87404a34e2c31622f6
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/msteinert/pam
