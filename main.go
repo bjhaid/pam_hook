@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"os"
 	"os/user"
-	"runtime"
 	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
+	"github.com/awnumar/memguard"
 	"github.com/golang/glog"
 	"github.com/msteinert/pam"
 	"golang.org/x/sys/unix"
@@ -147,26 +147,22 @@ func userNameFromToken(token string, signingKey string) (string, error) {
 	return username.(string), nil
 }
 
-func authenticateUser(username string, password string) error {
+func authenticateUser(username string, lockedPassword *memguard.LockedBuffer) error {
 	tx, err := pam.StartFunc("", username, func(s pam.Style, msg string) (string, error) {
-		return password, nil
+		return string(lockedPassword.Buffer()), nil
 	})
 	if err != nil {
 		return err
 	}
-	err = tx.Authenticate(0)
-	if err != nil {
+
+	if err := tx.Authenticate(0); err != nil {
 		return err
 	}
-	err = tx.AcctMgmt(pam.Silent)
-	if err != nil {
-		return err
-	}
-	runtime.GC()
-	return nil
+
+	return tx.AcctMgmt(pam.Silent)
 }
 
-func createToken(username string, c *Config) (string, error) {
+func createToken(username string, c *Config) ([]byte, error) {
 	claims := jws.Claims{
 		"username": username,
 	}
@@ -178,9 +174,9 @@ func createToken(username string, c *Config) (string, error) {
 	j := jws.NewJWT(claims, crypto.SigningMethodHS256)
 	b, err := j.Serialize([]byte(*c.SigningKey))
 	if err != nil {
-		return "", err
+		return []byte(""), err
 	}
-	return string(b), nil
+	return b, nil
 }
 
 func createResponseFromToken(token string, signingKey string) []byte {
@@ -200,9 +196,8 @@ func createResponseFromToken(token string, signingKey string) []byte {
 	json, err := json.Marshal(response)
 	if err == nil {
 		return json
-	} else {
-		return []byte("")
 	}
+	return []byte("")
 }
 
 func heartbeatHandler() func(http.ResponseWriter, *http.Request) {
@@ -223,8 +218,7 @@ func authenticateHandler(c *Config) func(http.ResponseWriter, *http.Request) {
 			fmt.Fprintln(w, "invalid request")
 			return
 		}
-		err = json.Unmarshal(body, &a)
-		if err != nil {
+		if err := json.Unmarshal(body, &a); err != nil {
 			fmt.Fprintln(w, "invalid request")
 			return
 		}
@@ -236,6 +230,14 @@ func authenticateHandler(c *Config) func(http.ResponseWriter, *http.Request) {
 func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		username, password, ok := r.BasicAuth()
+		lockedPassword, err := memguard.NewImmutableFromBytes([]byte(password))
+		password = ""
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		status := http.StatusOK
 		if !ok {
 			status = http.StatusNotFound
@@ -243,7 +245,7 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Supply username and password", http.StatusNotFound)
 			return
 		}
-		if err := authenticateUser(username, password); err != nil {
+		if err := authenticateUser(username, lockedPassword); err != nil {
 			status = http.StatusForbidden
 			glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
 			http.Error(w, err.Error(), http.StatusForbidden)
@@ -258,6 +260,7 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 		}
 		glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
 		fmt.Fprintf(w, "%s\n", b)
+		defer lockedPassword.Destroy()
 	}
 }
 
@@ -309,6 +312,14 @@ func main() {
 	http.HandleFunc("/authenticate", authenticateHandler(config))
 	bind := *config.BindAddress + ":" + *config.BindPort
 	glog.Infof("Starting pam_hook on %s", bind)
+
+	// Memguard setup
+	memguard.CatchInterrupt(func() {
+		fmt.Println("Interrupt signal received. Exiting...")
+	})
+	memguard.DisableUnixCoreDumps()
+	defer memguard.DestroyAll()
+
 	err := http.ListenAndServeTLS(bind, *config.TlsCertFile, *config.TlsKeyFile, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to start pamhook due to: %s", err)

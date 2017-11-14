@@ -1,6 +1,8 @@
-package: github.com/bjhaid/pam_auth
+package: github.com/bjhaid/pam_hook
 import:
 - package: golang.org/x/sys
   subpackages:
   - unix
 - package: github.com/golang/glog
+- package: github.com/awnumar/memguard
+  version: ^0.13.1
