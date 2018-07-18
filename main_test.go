@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,16 +12,18 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/SermoDigital/jose/jws"
 )
 
 var (
-	expiry     = 1
+	expiry     = 10
 	signingKey = "foo"
 	audience   = "k8s.io"
 	servername = "pamhook.com"
 	config     = &Config{
 		SigningKey:     &signingKey,
-		TokenExpiresIn: &expiry,
+		TokenExpiresIn: expiry,
 		Audience:       &audience,
 		ServerName:     &servername}
 	userS = &User{
@@ -68,8 +71,8 @@ func TestNewConfig(t *testing.T) {
 
 	nConfig := *newConfig()
 
-	if *(nConfig.TokenExpiresIn) != 5 {
-		t.Errorf("Expected returned TokenExpiresIn to be 5 got %v", *(nConfig.TokenExpiresIn))
+	if nConfig.TokenExpiresIn != 5 {
+		t.Errorf("Expected returned TokenExpiresIn to be 5 got %v", nConfig.TokenExpiresIn)
 	}
 
 	if *(nConfig.SigningKey) != "foo" {
@@ -139,6 +142,101 @@ func TestTokenHandlerHappyPath(t *testing.T) {
 	}
 }
 
+func TestTokenHandlerOverrideExpiry(t *testing.T) {
+	expectedExpiry := 3
+	req, err := http.NewRequest("GET", fmt.Sprintf("/token?token-expires-in=%d",
+		expectedExpiry), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Basic Zm9vOmJhcg==")
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(tokenHandler(config))
+	handler.ServeHTTP(rr, req)
+	// Check the status code is what we expect.
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+
+	buf, err := ioutil.ReadAll(rr.Body)
+
+	if err != nil {
+		t.Errorf("Failed reading response, due to: %s", err)
+	}
+
+	w, err := jws.ParseJWT(buf)
+
+	if err != nil {
+		t.Errorf("Failed parsing jwt, due to: %s", err)
+	}
+
+	configuredExpiry := int(w.Claims().Get("exp").(float64)) -
+		int(w.Claims().Get("iat").(float64))
+	if configuredExpiry != expectedExpiry*60 {
+		t.Errorf("Expected token expiry to be: %d got: %d", expectedExpiry*60,
+			configuredExpiry)
+	}
+}
+
+func TestTokenOverrideBadExpiry(t *testing.T) {
+	req, err := http.NewRequest("GET", "/token?token-expires-in=d", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Basic Zm9vOmJhcg==")
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(tokenHandler(config))
+	handler.ServeHTTP(rr, req)
+	// Check the status code is what we expect.
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+
+	buf, err := ioutil.ReadAll(rr.Body)
+	buf = buf[:len(buf)-1] // remove newline
+
+	if err != nil {
+		t.Errorf("Failed reading response, due to: %s", err)
+	}
+
+	expected := "'d' is not a valid integer"
+	if strings.Compare(string(buf), expected) != 0 {
+		t.Errorf("'%s' != '%s'", string(buf), expected)
+	}
+}
+
+func TestTokenOverrideCannotBeGreaterThanConfigured(t *testing.T) {
+	expectedExpiry := 1000
+	req, err := http.NewRequest("GET", fmt.Sprintf("/token?token-expires-in=%d",
+		expectedExpiry), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Basic Zm9vOmJhcg==")
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(tokenHandler(config))
+	handler.ServeHTTP(rr, req)
+	// Check the status code is what we expect.
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+
+	buf, err := ioutil.ReadAll(rr.Body)
+	buf = buf[:len(buf)-1] // remove newline
+
+	if err != nil {
+		t.Errorf("Failed reading response, due to: %s", err)
+	}
+
+	expected := "1000 is greater than the configured token-expiry"
+	if strings.Compare(string(buf), expected) != 0 {
+		t.Errorf("'%s' != '%s'", string(buf), expected)
+	}
+}
+
 func TestTokenHandlerNoCredentials(t *testing.T) {
 	req, err := http.NewRequest("GET", "/token", nil)
 	if err != nil {
@@ -192,7 +290,7 @@ func TestHeartbeatHandler(t *testing.T) {
 }
 
 func TestAuthenticateHandler(t *testing.T) {
-	token, err := createToken("foo", config)
+	token, err := createToken("foo", config, config.TokenExpiresIn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,9 +320,7 @@ func TestAuthenticateHandler(t *testing.T) {
 
 func TestAuthenticateHandlerExpiredToken(t *testing.T) {
 	expiry := -1
-	oldExpiry := config.TokenExpiresIn
-	config.TokenExpiresIn = &expiry
-	token, err := createToken("foo", config)
+	token, err := createToken("foo", config, expiry)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,12 +346,11 @@ func TestAuthenticateHandlerExpiredToken(t *testing.T) {
 			actual, successResponse)
 	}
 	authRequest.Spec = nil
-	config.TokenExpiresIn = oldExpiry
 }
 
 func TestAuthenticateHandlerInvalidUser(t *testing.T) {
-	config.TokenExpiresIn = &expiry
-	token, err := createToken("bar", config)
+	config.TokenExpiresIn = expiry
+	token, err := createToken("bar", config, config.TokenExpiresIn)
 	if err != nil {
 		t.Fatal(err)
 	}

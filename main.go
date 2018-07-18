@@ -21,7 +21,7 @@ import (
 )
 
 type Config struct {
-	TokenExpiresIn *int
+	TokenExpiresIn int
 	SigningKey     *string
 	Audience       *string
 	ServerName     *string
@@ -69,7 +69,7 @@ func newConfig() *Config {
 	if err != nil {
 		tokenExpiry = 10 //default token expiry
 	}
-	c.TokenExpiresIn = &tokenExpiry
+	c.TokenExpiresIn = tokenExpiry
 	signingKey := os.Getenv("PAMHOOK_SIGNING_KEY")
 	c.SigningKey = &signingKey
 	audience := os.Getenv("PAMHOOK_AUDIENCE")
@@ -166,14 +166,16 @@ func authenticateUser(username string, password string) error {
 	return nil
 }
 
-func createToken(username string, c *Config) (string, error) {
+func createToken(username string, c *Config, tokenExpiresIn int) (string,
+	error) {
 	claims := jws.Claims{
 		"username": username,
 	}
 	claims.SetAudience(*c.Audience)
 	claims.SetIssuedAt(time.Now())
 	claims.SetIssuer(*c.ServerName)
-	claims.SetExpiration(time.Now().Add(time.Minute * time.Duration(*c.TokenExpiresIn)))
+	claims.SetExpiration(time.Now().Add(time.Minute *
+		time.Duration(tokenExpiresIn)))
 
 	j := jws.NewJWT(claims, crypto.SigningMethodHS256)
 	b, err := j.Serialize([]byte(*c.SigningKey))
@@ -236,6 +238,25 @@ func authenticateHandler(c *Config) func(http.ResponseWriter, *http.Request) {
 func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		username, password, ok := r.BasicAuth()
+		tokenExpiresIn := c.TokenExpiresIn
+		if v := r.URL.Query().Get("token-expires-in"); v != "" {
+			if t, err := strconv.Atoi(v); err != nil {
+				glog.Errorf("Got a non int token expiry: %s", v)
+				http.Error(w, fmt.Sprintf("'%s' is not a valid integer", v),
+					http.StatusBadRequest)
+				return
+			} else {
+				if t > tokenExpiresIn {
+					glog.V(2).Infof("Ignoring token expiry %d, which is greater than" +
+						"configured token expiry")
+					http.Error(w, fmt.Sprintf("%d is greater than the configured"+
+						" token-expiry", t), http.StatusBadRequest)
+					return
+				} else {
+					tokenExpiresIn = t
+				}
+			}
+		}
 		status := http.StatusOK
 		if !ok {
 			status = http.StatusNotFound
@@ -249,7 +270,7 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
-		b, err := createToken(username, c)
+		b, err := createToken(username, c, tokenExpiresIn)
 		if err != nil {
 			status = http.StatusInternalServerError
 			glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
@@ -264,7 +285,7 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 func main() {
 	u, _ := user.Current()
 	config := newConfig()
-	flag.IntVar(config.TokenExpiresIn, "token-expires-in", *config.TokenExpiresIn, "Specifies how long the token is valid for in minutes, configurable via PAMHOOK_TOKEN_EXPIRES_IN environment variable")
+	flag.IntVar(&config.TokenExpiresIn, "token-expires-in", config.TokenExpiresIn, "Specifies how long the token is valid for in minutes, configurable via PAMHOOK_TOKEN_EXPIRES_IN environment variable")
 	flag.StringVar(config.SigningKey, "signing-key", *config.SigningKey, "Key for signing the token (required), configurable via PAMHOOK_SIGNING_KEY environment variable")
 	flag.StringVar(config.Audience, "audience", *config.Audience, "Server that consumes the pam_hook endpoint, configurable via PAMHOOK_AUDIENCE environment variable")
 	flag.StringVar(config.ServerName, "server-name", *config.ServerName, "The domain name for pam-hook, configurable via PAMHOOK_SERVERNAME environment variable")
@@ -294,7 +315,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Please provide a signing key")
 		os.Exit(1)
 	}
-	if *config.TokenExpiresIn == 0 {
+	if config.TokenExpiresIn == 0 {
 		fmt.Fprintln(os.Stderr, "Please provide a token expiry")
 		os.Exit(1)
 	}
