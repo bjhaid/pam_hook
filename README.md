@@ -82,7 +82,19 @@ contexts:
 `--authentication-token-webhook-config-file` flag (see the
 [kubernetes documentation](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
 for more information).
-- Get a token: `curl -u bjhaid --cacert pamhook_cert.crt https://pamhook:6443/token` 
+- Get a token: `curl -u bjhaid --cacert pamhook_cert.crt https://pamhook:6443/token`
+
+**Note**:
+
+You can also override the token expiration, however the override cannot be
+larger than the configured expiration, e.g:
+
+```bash
+curl -u bjhaid --cacert pamhook_cert.crt https://pamhook:6443/token?token-expires-in=3
+```
+
+in the above the token will expire in 3 minutes.
+
 
 ### How it works
 
