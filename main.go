@@ -148,6 +148,7 @@ func userNameFromToken(token string, signingKey string) (string, error) {
 }
 
 func authenticateUser(username string, password string) error {
+	glog.V(3).Infof("Received request from user: %s", username)
 	tx, err := pam.StartFunc("", username, func(s pam.Style, msg string) (string, error) {
 		return password, nil
 	})
@@ -254,6 +255,7 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 					return
 				} else {
 					tokenExpiresIn = t
+					glog.V(3).Infof("Overriding configured token with: %d", tokenExpiresIn)
 				}
 			}
 		}
@@ -266,18 +268,23 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := authenticateUser(username, password); err != nil {
 			status = http.StatusForbidden
-			glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
+			glog.V(2).Infof("%s %s: %s, %s, %d", r.Method, r.URL.Path, r.UserAgent(),
+				r.URL.Query(), status)
+			glog.Errorf("Authenticating user failed with: %s", err)
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
 		b, err := createToken(username, c, tokenExpiresIn)
 		if err != nil {
 			status = http.StatusInternalServerError
-			glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
+			glog.V(2).Infof("%s %s: %s, %v, %d", r.Method, r.URL.Path, r.UserAgent(),
+				r.URL.Query(), status)
+			glog.Errorf("%s", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		glog.V(2).Infof("%s %s: %s, %d", r.Method, r.URL.Path, r.UserAgent(), status)
+		glog.V(2).Infof("%s %s: %s, %v, %d", r.Method, r.URL.Path, r.UserAgent(),
+			r.URL.Query(), status)
 		fmt.Fprintf(w, "%s\n", b)
 	}
 }
