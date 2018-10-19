@@ -285,6 +285,7 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 		}
 		glog.V(2).Infof("%s %s: %s, %v, %d", r.Method, r.URL.Path, r.UserAgent(),
 			r.URL.Query(), status)
+		w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", b))
 		fmt.Fprintf(w, "%s\n", b)
 	}
 }
