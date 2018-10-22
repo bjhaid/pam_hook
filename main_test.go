@@ -140,6 +140,13 @@ func TestTokenHandlerHappyPath(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusOK)
 	}
+	// Check that the authorization header is set
+	authHeader := rr.Result().Header.Get("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		t.Errorf(
+			"Authorization header is wrong: got '%s' want something like 'Bearer <token here>'",
+			authHeader)
+	}
 }
 
 func TestTokenHandlerOverrideExpiry(t *testing.T) {
