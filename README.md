@@ -1,6 +1,7 @@
 [![Build Status](https://api.travis-ci.org/bjhaid/pam_hook.svg?branch=master)](https://travis-ci.org/bjhaid/pam_hook)
 
 # pam_hook
+
 A [PAM](http://www.linux-pam.org/) webhook endpoint that can be used with [Kubernetes](https://github.com/kubernetes/kubernetes).
 
 ### You should consider using this if:
@@ -33,6 +34,8 @@ Usage of ./pam_hook:
          (default "8080")
   -cert-file string
         Absolute path to TLS CA certificate, configurable via PAMHOOK_TLS_CERT_FILE environment variable
+  -disable-mlock
+        Disable calling sys mlock
   -key-file string
         Absolute path to TLS private key file, configurable via PAMHOOK_TLS_KEY_FILE environment variable
   -log_backtrace_at value
@@ -41,6 +44,8 @@ Usage of ./pam_hook:
         If non-empty, write log files in this directory
   -logtostderr
         log to standard error instead of files
+  -pam-service-name string
+        PAM service name against which to perform user authentication during token creation, configurable via PAMHOOK_PAM_SERVICE_NAME environment variable
   -server-name string
         The domain name for pam-hook, configurable via PAMHOOK_SERVERNAME environment variable
   -signing-key string
@@ -57,7 +62,19 @@ Usage of ./pam_hook:
 
 Command line flags override options configured via environment variables.
 
-- Create a kubeconfig file as below:
+**Notes on select options**
+
+Some options relate to JSON Web Tokens (JWT) used by Kubernetes Webhook Token Authentication.
+
+- `audience`: The audience claim that identifies the recipients that the JWT is intended for
+- `server-name`: The issuer claim identifies the principal that issued the JWT
+- `pam-service-name`: The PAM service against which user authentications are performed during token creation. For example, "passwd".
+- `disable-mlock`: Prevents a call to _unix.Mlockall()_, which would have prevented sensitive authentication material in memory from appearing in core dumps.
+
+**Kubernetes Webhook Token Authentication configuration**
+
+- Create a kubeconfig file as below
+
 ```
 apiVersion: v1
 clusters:
@@ -79,9 +96,9 @@ contexts:
 ```
 
 - Pass the path to the kubeconfig file to the `kube-apiserver` via the
-`--authentication-token-webhook-config-file` flag (see the
-[kubernetes documentation](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
-for more information).
+  `--authentication-token-webhook-config-file` flag (see the
+  [Kubernetes documentation](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
+  for more information).
 - Get a token: `curl -u bjhaid --cacert pamhook_cert.crt https://pamhook:6443/token`
 
 **Note**:
@@ -95,11 +112,10 @@ curl -u bjhaid --cacert pamhook_cert.crt https://pamhook:6443/token?token-expire
 
 in the above the token will expire in 3 minutes.
 
-
 ### How it works
 
 - The user hits the `/token` endpoint of `pamhook` and gets a token in exchange for their
-OS username and password.  Here's an example request:
+  OS username and password. Here's an example request:
 
 ```bash
 curl --cacert pamhook_cert.crt https://localhost:6443/token -u bjhaid
@@ -107,10 +123,10 @@ Enter host password for user 'bjhaid':
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIiLCJleHAiOjE0OTY2MTQwMzcsImlhdCI6MTQ5NjYxMjIzNywiaXNzIjoiIiwidXNlcm5hbWUiOiJiamhhaWQifQ.8GVZJJPa_GYxcsHy-WBMYlel_JSyoSLXnwnt4Bp_Nk0
 ```
 
-- `pam_hook` authenticates the user against PAM.  If the username and password combination
-is valid and the user's account or password has not expired, `pam_hook` returns with an
-HMAC signed JWT token which contains the user's `username`, `issuer`, `issued_at`, `expiry` and
-token audience.  Otherwise it returns with `Authentication failure`.
+- `pam_hook` authenticates the user against PAM. If the username and password combination
+  is valid and the user's account or password has not expired, `pam_hook` returns with an
+  HMAC signed JWT token which contains the user's `username`, `issuer`, `issued_at`, `expiry` and
+  token audience. Otherwise it returns with `Authentication failure`.
 
 A successful response will look something like:
 `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIiLCJleHAiOjE0OTY2MTQwMzcsImlhdCI6MTQ5NjYxMjIzNywiaXNzIjoiIiwidXNlcm5hbWUiOiJiamhhaWQifQ.8GVZJJPa_GYxcsHy-WBMYlel_JSyoSLXnwnt4Bp_Nk0`
@@ -118,8 +134,8 @@ A successful response will look something like:
 while a failure will simply be the string `"Authentication failure"`.
 
 - The user makes Kubernetes API calls using the received token, and `kube-api-server` hits
-the configured `pam_hook` endpoint.  If the token is valid and not expired `pam_hook`
-responds with:
+  the configured `pam_hook` endpoint. If the token is valid and not expired `pam_hook`
+  responds with:
 
 ```json
 {
@@ -130,16 +146,14 @@ responds with:
     "user": {
       "username": "bjhaid",
       "uid": "1000",
-      "groups": [
-        "bjhaid",
-        "sudo"
-      ]
+      "groups": ["bjhaid", "sudo"]
     }
   }
 }
 ```
 
 However if the token is invalid or has expired `pam_hook` responds with:
+
 ```
 {
   "apiVersion": "authentication.k8s.io/v1beta1",
@@ -149,12 +163,12 @@ However if the token is invalid or has expired `pam_hook` responds with:
   }
 }
 ```
+
 - Kubernetes proceeds based on the value of `"authenticated"`.
 
 ### Healthcheck:
 
 Health check route is `/heartbeat`
-
 
 ### Building:
 

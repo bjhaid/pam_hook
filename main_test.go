@@ -21,11 +21,14 @@ var (
 	signingKey = "foo"
 	audience   = "k8s.io"
 	servername = "pamhook.com"
+	pamServiceName = "passwd"
 	config     = &Config{
 		SigningKey:     &signingKey,
 		TokenExpiresIn: expiry,
 		Audience:       &audience,
-		ServerName:     &servername}
+		ServerName:     &servername,
+		PAMServiceName: &pamServiceName,
+	}
 	userS = &User{
 		Username: "foo",
 		Uid:      "1000",
@@ -68,6 +71,7 @@ func TestNewConfig(t *testing.T) {
 	os.Setenv("PAMHOOK_SERVERNAME", "pamhook.io")
 	os.Setenv("PAMHOOK_TLS_KEY_FILE", "/etc/ssl/private/pamhook.key")
 	os.Setenv("PAMHOOK_TLS_CERT_FILE", "/etc/ssl/certs/pamhook.cert")
+	os.Setenv("PAMHOOK_PAM_SERVICE_NAME", "passwd")
 
 	nConfig := *newConfig()
 
@@ -93,6 +97,10 @@ func TestNewConfig(t *testing.T) {
 
 	if *(nConfig.TlsCertFile) != "/etc/ssl/certs/pamhook.cert" {
 		t.Errorf("Expected returned TlsCertFile to be '/etc/ssl/certs/pamhook.cert' got %v", *(nConfig.TlsCertFile))
+	}
+
+	if *(nConfig.PAMServiceName) != "passwd" {
+		t.Errorf("Expected returned PAMServiceName to be 'passwd' got %v", *(nConfig.PAMServiceName))
 	}
 }
 
