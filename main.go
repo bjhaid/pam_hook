@@ -30,6 +30,7 @@ type Config struct {
 	TlsKeyFile     *string
 	TlsCertFile    *string
 	DisableMlock   *bool
+	PAMServiceName *string
 }
 
 type User struct {
@@ -80,6 +81,8 @@ func newConfig() *Config {
 	c.TlsKeyFile = &tlsKeyFile
 	tlsCertFile := os.Getenv("PAMHOOK_TLS_CERT_FILE")
 	c.TlsCertFile = &tlsCertFile
+	pamServiceName := os.Getenv("PAMHOOK_PAM_SERVICE_NAME")
+	c.PAMServiceName = &pamServiceName
 	// Have to take a pointer so we need a new var.
 	disableMlock := false
 	c.DisableMlock = &disableMlock
@@ -147,9 +150,9 @@ func userNameFromToken(token string, signingKey string) (string, error) {
 	return username.(string), nil
 }
 
-func authenticateUser(username string, password string) error {
+func authenticateUser(pamServiceName *string, username string, password string) error {
 	glog.V(3).Infof("Received request from user: %s", username)
-	tx, err := pam.StartFunc("", username, func(s pam.Style, msg string) (string, error) {
+	tx, err := pam.StartFunc(*pamServiceName, username, func(s pam.Style, msg string) (string, error) {
 		return password, nil
 	})
 	if err != nil {
@@ -248,8 +251,8 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 				return
 			} else {
 				if t > tokenExpiresIn {
-					glog.V(2).Infof("Ignoring token expiry %d, which is greater than" +
-						"configured token expiry")
+					glog.V(2).Infof("Ignoring token expiry %d, which is greater than"+
+						"configured token expiry: ", tokenExpiresIn)
 					http.Error(w, fmt.Sprintf("%d is greater than the configured"+
 						" token-expiry", t), http.StatusBadRequest)
 					return
@@ -266,7 +269,7 @@ func tokenHandler(c *Config) func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Supply username and password", http.StatusNotFound)
 			return
 		}
-		if err := authenticateUser(username, password); err != nil {
+		if err := authenticateUser(c.PAMServiceName, username, password); err != nil {
 			status = http.StatusForbidden
 			glog.V(2).Infof("%s %s: %s, %s, %d", r.Method, r.URL.Path, r.UserAgent(),
 				r.URL.Query(), status)
@@ -301,6 +304,7 @@ func main() {
 	flag.StringVar(config.BindPort, "bind-port", *config.BindPort, "")
 	flag.StringVar(config.TlsKeyFile, "key-file", *config.TlsKeyFile, "Absolute path to TLS private key file, configurable via PAMHOOK_TLS_KEY_FILE environment variable")
 	flag.StringVar(config.TlsCertFile, "cert-file", *config.TlsCertFile, "Absolute path to TLS CA certificate, configurable via PAMHOOK_TLS_CERT_FILE environment variable")
+	flag.StringVar(config.PAMServiceName, "pam-service-name", *config.PAMServiceName, "PAM service name against which to perform user authentication during token creation, configurable via PAMHOOK_PAM_SERVICE_NAME environment variable")
 	flag.BoolVar(config.DisableMlock, "disable-mlock", *config.DisableMlock, "Disable calling sys mlock")
 	flag.Set("logtostderr", "true")
 	flag.Set("v", "2")
@@ -329,7 +333,7 @@ func main() {
 	}
 	if !*config.DisableMlock {
 		if err := unix.Mlockall(syscall.MCL_CURRENT | syscall.MCL_FUTURE); err != nil {
-			fmt.Println(os.Stderr, "Unable to lock memory: %s", err)
+			fmt.Fprintf(os.Stderr, "Unable to lock memory: %v", err)
 			os.Exit(1)
 		}
 	}
@@ -340,7 +344,7 @@ func main() {
 	glog.Infof("Starting pam_hook on %s", bind)
 	err := http.ListenAndServeTLS(bind, *config.TlsCertFile, *config.TlsKeyFile, nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to start pamhook due to: %s", err)
+		fmt.Fprintf(os.Stderr, "Failed to start pamhook due to: %s", err)
 		os.Exit(1)
 	}
 }
