@@ -17,12 +17,12 @@ import (
 )
 
 var (
-	expiry     = 10
-	signingKey = "foo"
-	audience   = "k8s.io"
-	servername = "pamhook.com"
+	expiry         = 10
+	signingKey     = "foo"
+	audience       = "k8s.io"
+	servername     = "pamhook.com"
 	pamServiceName = "passwd"
-	config     = &Config{
+	config         = &Config{
 		SigningKey:     &signingKey,
 		TokenExpiresIn: expiry,
 		Audience:       &audience,
@@ -52,8 +52,16 @@ func init() {
 	cmd := exec.Command("groupadd", "deployer")
 	var out bytes.Buffer
 	err := cmd.Run()
+	if err != nil {
+		fmt.Println(out.String())
+		fmt.Println(err)
+	}
 	cmd = exec.Command("groupadd", "admin")
 	err = cmd.Run()
+	if err != nil {
+		fmt.Println(out.String())
+		fmt.Println(err)
+	}
 	cmd = exec.Command("useradd", "-p", "salrRVtmwT6Wg", "-G", "deployer,admin", "foo")
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -311,7 +319,13 @@ func TestAuthenticateHandler(t *testing.T) {
 	}
 	authRequest.Spec = &Spec{Token: token}
 	reqBody, err := json.Marshal(authRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req, err := http.NewRequest("POST", "/authenticate", bytes.NewBuffer(reqBody))
+	if err != nil {
+		t.Fatal(err)
+	}
 	rr := httptest.NewRecorder()
 	handler := http.HandlerFunc(authenticateHandler(config))
 	handler.ServeHTTP(rr, req)
@@ -321,7 +335,7 @@ func TestAuthenticateHandler(t *testing.T) {
 			status, http.StatusOK)
 	}
 	actual := &Response{}
-	err = json.Unmarshal([]byte(rr.Body.String()), actual)
+	err = json.Unmarshal(rr.Body.Bytes(), actual)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +355,13 @@ func TestAuthenticateHandlerExpiredToken(t *testing.T) {
 	}
 	authRequest.Spec = &Spec{Token: token}
 	reqBody, err := json.Marshal(authRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req, err := http.NewRequest("POST", "/authenticate", bytes.NewBuffer(reqBody))
+	if err != nil {
+		t.Fatal(err)
+	}
 	rr := httptest.NewRecorder()
 	handler := http.HandlerFunc(authenticateHandler(config))
 	handler.ServeHTTP(rr, req)
@@ -351,7 +371,7 @@ func TestAuthenticateHandlerExpiredToken(t *testing.T) {
 			status, http.StatusOK)
 	}
 	actual := &Response{}
-	err = json.Unmarshal([]byte(rr.Body.String()), actual)
+	err = json.Unmarshal(rr.Body.Bytes(), actual)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +391,13 @@ func TestAuthenticateHandlerInvalidUser(t *testing.T) {
 	}
 	authRequest.Spec = &Spec{Token: token}
 	reqBody, err := json.Marshal(authRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req, err := http.NewRequest("POST", "/authenticate", bytes.NewBuffer(reqBody))
+	if err != nil {
+		t.Fatal(err)
+	}
 	rr := httptest.NewRecorder()
 	handler := http.HandlerFunc(authenticateHandler(config))
 	handler.ServeHTTP(rr, req)
@@ -381,7 +407,7 @@ func TestAuthenticateHandlerInvalidUser(t *testing.T) {
 			status, http.StatusOK)
 	}
 	actual := &Response{}
-	err = json.Unmarshal([]byte(rr.Body.String()), actual)
+	err = json.Unmarshal(rr.Body.Bytes(), actual)
 	if err != nil {
 		t.Fatal(err)
 	}

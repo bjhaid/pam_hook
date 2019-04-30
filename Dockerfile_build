@@ -1,6 +1,6 @@
 FROM debian:stretch
 RUN apt-get update && \
-    apt-get install -y libpam0g:amd64 \
+    apt-get install -y libpam0g:amd64 git\
     libpam0g-dev:amd64 wget tar build-essential && \
     rm -rf /var/lib/apt/lists/* && \
     wget https://storage.googleapis.com/golang/go1.12.4.linux-amd64.tar.gz && \
