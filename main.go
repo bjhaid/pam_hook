@@ -175,10 +175,11 @@ func createToken(username string, c *Config, tokenExpiresIn int) (string,
 	claims := jws.Claims{
 		"username": username,
 	}
+	now := time.Now().UTC()
 	claims.SetAudience(*c.Audience)
-	claims.SetIssuedAt(time.Now())
+	claims.SetIssuedAt(now)
 	claims.SetIssuer(*c.ServerName)
-	claims.SetExpiration(time.Now().Add(time.Minute *
+	claims.SetExpiration(now.Add(time.Minute *
 		time.Duration(tokenExpiresIn)))
 
 	j := jws.NewJWT(claims, crypto.SigningMethodHS256)
