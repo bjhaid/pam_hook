@@ -193,7 +193,7 @@ make test
   -v $PWD/pamhook_cert.crt:/etc/ssl/certs/pamhook_cert.crt \
   -v $PWD/pamhook_key.crt:/etc/ssl/private/pamhook_key.crt \
   --cap-add IPC_LOCK \
-  bjhaid/pam_hook:0.4.0 /usr/bin/pam_hook \
+  bjhaid/pam_hook:0.4.1 /usr/bin/pam_hook \
   -cert-file /etc/ssl/certs/pamhook_cert.crt \
   -key-file /etc/ssl/private/pamhook_key.crt \
   -bind-port 6443 -v 2
