@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -343,7 +344,11 @@ func main() {
 	http.HandleFunc("/authenticate", authenticateHandler(config))
 	bind := *config.BindAddress + ":" + *config.BindPort
 	glog.Infof("Starting pam_hook on %s", bind)
-	err := http.ListenAndServeTLS(bind, *config.TlsCertFile, *config.TlsKeyFile, nil)
+	cfg := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	server := &http.Server{Addr: bind, Handler: nil, TLSConfig: cfg}
+	err := server.ListenAndServeTLS(*config.TlsCertFile, *config.TlsKeyFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start pamhook due to: %s", err)
 		os.Exit(1)
