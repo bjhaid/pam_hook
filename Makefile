@@ -1,4 +1,4 @@
-TAG = bjhaid/pam_hook:0.4.1
+TAG = bjhaid/pam_hook:0.4.2
 
 build:
 	docker build -t pam_hook -f Dockerfile_build .
