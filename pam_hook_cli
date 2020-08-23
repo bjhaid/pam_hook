@@ -16,6 +16,7 @@ function help() {
   echo "-u | --username username to retrieve token from pamhook for"
   echo "-c | --cacert ca certificate to use to communicate with pamhook"
   echo "-e | --endpoint pamhook url, e.g https://pamhook.svc.local"
+  echo "-v | --tokenvalidity how long the token retrieved from pamhook is valid for"
   echo "-h | --help this help message"
 }
 
