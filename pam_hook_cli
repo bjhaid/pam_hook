@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+
+set -o pipefail
+
+# globals
+USERNAME=
+CACERT=
+PAMHOOK_ENDPOINT=
+TOKEN_FILE="$HOME/.kube/token-file"
+TOKEN_VALIDITY_IN_SECONDS=86400
+
+set -u
+
+function help() {
+  echo "HELP"
+  echo "-u | --username username to retrieve token from pamhook for"
+  echo "-c | --cacert ca certificate to use to communicate with pamhook"
+  echo "-e | --endpoint pamhook url, e.g https://pamhook.svc.local"
+  echo "-h | --help this help message"
+}
+
+function isTokenExpired() {
+  if [[ ! -f $TOKEN_FILE ]]; then
+    return
+  fi
+  local token_expiry
+  local seconds_since_token_was_created
+  token_expiry=$(head -n1 "$TOKEN_FILE")
+  seconds_since_token_was_created=$(($(date +%s -d "$token_expiry") - $(date +%s)))
+
+  if [[ $seconds_since_token_was_created -gt 0 ]]; then
+    return 1
+  fi
+}
+
+function retrieveToken() {
+  if ! isTokenExpired; then
+    tail -n+2 "$TOKEN_FILE"
+    return
+  fi
+
+  local -a cacert_args=()
+  local token_file
+  token_file=$(mktemp)
+  if [[ -n $CACERT ]]; then
+    cacert_args=(--cacert "$CACERT")
+  fi
+
+  if [[ -z $PAMHOOK_ENDPOINT || -z $USERNAME ]]; then
+    echo "please provide username and/or pamhook endpoint"
+    echo "see -h for help message"
+    exit 1
+  fi
+
+  local token
+  response_code=$(curl -s -o "$token_file" -w "%{http_code}" "${cacert_args[@]}" -u "$USERNAME" "$PAMHOOK_ENDPOINT"/token)
+  token=$(cat "$token_file")
+  rm -rf "$token_file"
+
+  if [[ $response_code != 200 ]]; then
+    echo "got $token from pamhook endpoint: $PAMHOOK_ENDPOINT"
+    exit 1
+  fi
+  local token_expiry
+  token_expiry=$(date -d +"$TOKEN_VALIDITY_IN_SECONDS"seconds -Iseconds)
+  echo "$token_expiry" > "$TOKEN_FILE"
+
+  cat << EOM | tee -a "$TOKEN_FILE"
+{
+  "apiVersion":"client.authentication.k8s.io/v1beta1",
+  "kind":"ExecCredential",
+  "status": {
+     "token":"$token",
+     "expirationTimestamp": "$token_expiry"
+   }
+}
+EOM
+}
+
+function __main() {
+  if [[ $# == 0 ]]; then
+    help
+    exit 1
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    arguments=$1
+    case "$arguments" in
+      -c | --cacert)
+        CACERT=$2
+        shift
+        shift
+        ;;
+      -e | --endpoint)
+        PAMHOOK_ENDPOINT=$2
+        shift
+        shift
+        ;;
+      -u | --username)
+        USERNAME=$2
+        shift
+        shift
+        ;;
+      -v | --tokenvalidity)
+        TOKEN_VALIDITY_IN_SECONDS=$2
+        shift
+        shift
+        ;;
+      -h | --help)
+        help
+        exit 0
+        ;;
+      *)
+        help
+        exit 1
+        ;;
+    esac
+  done
+  retrieveToken
+}
+
+__main "$@"
